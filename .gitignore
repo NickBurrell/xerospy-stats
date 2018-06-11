@@ -1,0 +1,8 @@
+node_modules/
+vendor*/
+_vendor*/
+*.lock
+.#*
+config/
+dist/
+assets/

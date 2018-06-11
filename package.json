@@ -1,0 +1,35 @@
+{
+  "name": "openscout-server",
+  "version": "1.0.0",
+  "description": "OpenScout open-source analytics platform ",
+  "main": "app.go",
+  "scripts": {
+    "test": "go test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/zero-frost/openscout-server"
+  },
+  "author": "Nicholas Burrell <zero_frost@protonmail.com>",
+  "license": "MPL-2.0",
+  "devDependencies": {
+    "awesome-typescript-loader": "^5.0.0",
+    "grunt": "^1.0.3",
+    "grunt-webpack": "^3.1.2",
+    "matchdep": "^2.0.0",
+    "ts-loader": "^4.4.1",
+    "typescript": "^2.9.1"
+  },
+  "dependencies": {
+    "@types/react": "^16.3.17",
+    "@types/react-dom": "^16.0.6",
+    "bootstrap3": "^3.3.5",
+    "path": "^0.12.7",
+    "react": "^16.4.0",
+    "react-dom": "^16.4.0",
+    "redux": "^4.0.0",
+    "rxjs": "^6.2.0",
+    "source-map-loader": "^0.2.3",
+    "webpack": "^4.12.0"
+  }
+}
