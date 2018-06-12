@@ -5,9 +5,9 @@ import (
 )
 
 type DatabaseSettings struct {
-	User         string
-	Password     string
 	Address      string
+	Username     string
+	Password     string
 	DatabaseName string
 }
 
@@ -16,12 +16,23 @@ type ServerSettings struct {
 	Salt string
 }
 
+type RedisSettings struct {
+	Address  string
+	Password string
+	Database int
+}
+
 type ServerConfig struct {
 	ServerSettings   ServerSettings
 	DatabaseSettings DatabaseSettings
+	RedisSettings    RedisSettings
 }
 
 func GenerateConfig() {
+
+	if _, err := os.Stat("./config"); os.IsNotExist(err) {
+		os.Mkdir("./config", 0755)
+	}
 
 	configFile, err := os.Create("./config/config.toml")
 
@@ -38,8 +49,14 @@ Salt = ""
 [DatabaseSettings]
 User = ""
 Password = ""
-Address = "127.0.0.1"
-DatabaseName = "scouting"`
+Address = "127.0.0.1:3306"
+DatabaseName = "scouting"
+
+[RedisSettings]
+Address = "127.0.0.1:6379"
+Password = ""
+Database = 0
+`
 	configFile.Write([]byte(initialConfig))
 
 }

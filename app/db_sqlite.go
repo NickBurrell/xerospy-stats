@@ -14,7 +14,7 @@ var db *gorm.DB
 func InitDatabase(user string, password string, address string, db_name string) {
 
 	if _, err := os.Stat("./db/"); err != nil {
-		os.Mkdir("./db", 755)
+		os.Mkdir("./db", 0755)
 	}
 
 	db_conn, _ := gorm.Open("sqlite3", "./db/"+db_name+".db")

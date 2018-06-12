@@ -7,3 +7,4 @@ config/
 dist/
 assets/
 db/*
+xerospy-stats
