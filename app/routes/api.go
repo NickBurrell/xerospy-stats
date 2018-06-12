@@ -1,19 +1,18 @@
 package routes
 
 import (
-	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/zero-frost/xerospy-stats/app/controllers"
-	"net/http"
+	"github.com/zero-frost/xerospy-stats/app"
+	"github.com/zero-frost/xerospy-stats/app/controllers/api"
 )
 
 func GetAPIRoutes() *mux.Router {
 
+	tc := api.TeamController{DB: app.GetDatabase()}
+
 	apiRouter := mux.NewRouter()
 
-	apiRouter.HandleFunc("/api/team/{team_id}", controllers.GetTeam).Methods("GET")
-	apiRouter.HandleFunc("/api/team", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "Test")
-	})
+	apiRouter.HandleFunc("/api/team/{team_id}", tc.GetTeam).Methods("GET")
+	apiRouter.HandleFunc("/api/team", tc.GetTeams).Methods("GET")
 	return apiRouter
 }

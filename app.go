@@ -42,6 +42,11 @@ func initServer() app.ServerConfig {
 	config := app.ServerConfig{}
 	toml.Unmarshal(buffer, &config)
 
+	if config.ServerSettings.Salt == "" {
+		fmt.Print(color.RedString("[!] Error: Salt not set! Please set a new password salt to continue\n"))
+		os.Exit(3)
+	}
+
 	return config
 }
 
@@ -104,10 +109,14 @@ func main() {
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
-	file, err := ioutil.ReadFile("template/index.html")
+	file, err := ioutil.ReadFile("template/index.hbs")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Fprint(w, string(file))
+	index, err := raymond.Render(string(file), map[string]string{"title": "Hello"})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Fprint(w, index)
 
 }

@@ -1,3 +1,5 @@
+// +build mysql !sqlite
+
 package app
 
 import (

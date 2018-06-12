@@ -13,6 +13,7 @@ type DatabaseSettings struct {
 
 type ServerSettings struct {
 	Port int
+	Salt string
 }
 
 type ServerConfig struct {
@@ -32,6 +33,7 @@ func GenerateConfig() {
 
 	initialConfig := `[ServerSettings]
 Port = 3000
+Salt = ""
 
 [DatabaseSettings]
 User = ""
