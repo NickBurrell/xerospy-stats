@@ -46,9 +46,6 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hasher := sha256.New()
-	hasher.Write([]byte("D3@ThC0D3error-code-xero"))
-	var hexData []byte
 	hashedPass := sha256.Sum256([]byte(credentials.Password + app.GetServerConfig().ServerSettings.Salt))
 
 	//hex.Decode(hexData, temp[:])
