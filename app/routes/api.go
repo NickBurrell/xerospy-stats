@@ -21,5 +21,7 @@ func GetAPIRoutes() *mux.Router {
 	apiRouter.HandleFunc("/api/user/login", lc.Login).Methods("POST")
 	apiRouter.HandleFunc("/api/user/refresh", lc.Refresh)
 	apiRouter.HandleFunc("/api/user/logout", lc.Logout)
+	apiRouter.HandleFunc("/api/user", lc.CreateUser).Methods("POST")
+	apiRouter.HandleFunc("/api/user", lc.UpdateUser).Methods("PUT")
 	return apiRouter
 }
