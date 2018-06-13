@@ -1,16 +1,15 @@
-package api
+package controllers
 
 import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/jinzhu/gorm"
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"net/http"
 )
 
 type TeamController struct {
-	DB *gorm.DB
+	*Controller
 }
 
 func (tc *TeamController) GetTeam(w http.ResponseWriter, r *http.Request) {

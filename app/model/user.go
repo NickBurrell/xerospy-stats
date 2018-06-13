@@ -1,15 +1,15 @@
 package model
 
 import (
-	"github.com/jinzhu/gorm"
 	"regexp"
+	"time"
 )
 
 type User struct {
-	gorm.Model
-	Username string `gorm:"not null;unique"`
-	Email    string `gorm:"not null;unique"`
-	Password string `gorm:"not null"`
+	CreatedAt time.Time
+	Username  string `gorm:"not null;unique"`
+	Email     string `gorm:"not null;unique"`
+	Password  string `gorm:"not null"`
 }
 
 func ValidateEmail(email string) bool {

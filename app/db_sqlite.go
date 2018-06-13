@@ -9,28 +9,19 @@ import (
 	"os"
 )
 
-var db *gorm.DB
-
-func InitDatabase(user string, password string, address string, db_name string) {
-
+func (s *Server) InitDatabase() {
 	if _, err := os.Stat("./db/"); err != nil {
 		os.Mkdir("./db", 0755)
 	}
 
-	db_conn, _ := gorm.Open("sqlite3", "./db/"+db_name+".db")
+	s.Database, _ = gorm.Open("sqlite3", "./db/"+s.ServerConfig.DatabaseSettings.DatabaseName+".db")
 
-	db_conn.AutoMigrate(&model.User{})
-	db_conn.AutoMigrate(&model.Team{})
-	db_conn.AutoMigrate(&model.Event{})
-	db_conn.AutoMigrate(&model.Match{})
-	db_conn.AutoMigrate(&model.ActionType{})
-	db_conn.AutoMigrate(&model.TeamMatch{})
-	db_conn.AutoMigrate(&model.TeamMatchAction{})
+	s.Database.AutoMigrate(&model.User{})
+	s.Database.AutoMigrate(&model.Team{})
+	s.Database.AutoMigrate(&model.Event{})
+	s.Database.AutoMigrate(&model.Match{})
+	s.Database.AutoMigrate(&model.ActionType{})
+	s.Database.AutoMigrate(&model.TeamMatch{})
+	s.Database.AutoMigrate(&model.TeamMatchAction{})
 
-	db = db_conn
-
-}
-
-func GetDatabase() *gorm.DB {
-	return db
 }

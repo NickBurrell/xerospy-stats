@@ -5,9 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/jinzhu/gorm"
 	"github.com/satori/go.uuid"
-	"github.com/zero-frost/xerospy-stats/app"
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"log"
 	"net/http"
@@ -16,13 +14,27 @@ import (
 )
 
 type LoginController struct {
-	DB *gorm.DB
+	*Controller
+	Salt string
 }
 
 type loginData struct {
 	Username string
 	Password string
 	Email    string
+}
+
+func getSessionToken(r *http.Request) (*http.Cookie, error) {
+	c, err := r.Cookie("session_token")
+
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return &http.Cookie{}, http.ErrNoCookie
+		}
+		return &http.Cookie{}, http.ErrNoCookie
+	}
+
+	return c, nil
 }
 
 func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +59,7 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedPass := sha256.Sum256([]byte(credentials.Password + app.GetServerConfig().ServerSettings.Salt))
+	hashedPass := sha256.Sum256([]byte(credentials.Password + lc.Salt))
 
 	if !bytes.Equal([]byte(userData.Password), hashedPass[:]) {
 		fmt.Fprint(w, "Incorrect Password\n")
@@ -56,7 +68,7 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 	sessionToken, _ := uuid.NewV4()
 
-	err = app.GetCache().Set(sessionToken.String(), credentials.Username, time.Duration(300*time.Second)).Err()
+	err = lc.Cache.Set(sessionToken.String(), credentials.Username, time.Duration(300*time.Second)).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -75,19 +87,15 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
 
 func (lc LoginController) Refresh(w http.ResponseWriter, r *http.Request) {
 
-	c, err := r.Cookie("session_token")
+	c, err := getSessionToken(r)
 	if err != nil {
-		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	sessionToken := c.Value
 
-	response, err := app.GetCache().Get(sessionToken).Result()
+	response, err := lc.Cache.Get(sessionToken).Result()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -100,13 +108,13 @@ func (lc LoginController) Refresh(w http.ResponseWriter, r *http.Request) {
 	// At this point we know the user is valid
 
 	newSessionToken, _ := uuid.NewV4()
-	err = app.GetCache().Set(newSessionToken.String(), fmt.Sprint(response), time.Duration(300*time.Second)).Err()
+	err = lc.Cache.Set(newSessionToken.String(), fmt.Sprint(response), time.Duration(300*time.Second)).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	err = app.GetCache().Del(sessionToken).Err()
+	err = lc.Cache.Del(sessionToken).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -122,20 +130,15 @@ func (lc LoginController) Refresh(w http.ResponseWriter, r *http.Request) {
 
 func (lc LoginController) Logout(w http.ResponseWriter, r *http.Request) {
 
-	c, err := r.Cookie("session_token")
-
+	c, err := getSessionToken(r)
 	if err != nil {
-		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
 	sessionToken := c.Value
 
-	err = app.GetCache().Del(sessionToken).Err()
+	err = lc.Cache.Del(sessionToken).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -189,7 +192,7 @@ func (lc LoginController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Invalid Email %s", credentials.Email)
 		return
 	}
-	hashedBytes := sha256.Sum256([]byte(credentials.Password + app.GetServerConfig().ServerSettings.Salt))
+	hashedBytes := sha256.Sum256([]byte(credentials.Password + lc.Salt))
 	hashedPass := string(hashedBytes[:])
 
 	lc.DB.Create(&model.User{
@@ -200,7 +203,7 @@ func (lc LoginController) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	sessionToken, _ := uuid.NewV4()
 
-	err = app.GetCache().Set(sessionToken.String(), credentials.Username, time.Duration(300*time.Second)).Err()
+	err = lc.Cache.Set(sessionToken.String(), credentials.Username, time.Duration(300*time.Second)).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -238,7 +241,7 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response, err := app.GetCache().Get(sessionToken).Result()
+	response, err := lc.Cache.Get(sessionToken).Result()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -261,7 +264,7 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	lc.DB.Where("username = ?", response).First(&userData)
 
 	if updatedUserData.Password != "" {
-		newHashedPass := sha256.Sum256([]byte(updatedUserData.Password + app.GetServerConfig().ServerSettings.Salt))
+		newHashedPass := sha256.Sum256([]byte(updatedUserData.Password + lc.Salt))
 		updatedUserData.Password = string(newHashedPass[:])
 	}
 
@@ -279,13 +282,13 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	newSessionToken, _ := uuid.NewV4()
 
-	err = app.GetCache().Set(newSessionToken.String(), userData.Username, time.Duration(300*time.Second)).Err()
+	err = lc.Cache.Set(newSessionToken.String(), userData.Username, time.Duration(300*time.Second)).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	err = app.GetCache().Del(sessionToken).Err()
+	err = lc.Cache.Del(sessionToken).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -298,4 +301,59 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		Expires: time.Now().Add(300 * time.Second),
 	})
 
+}
+
+func (lc LoginController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	c, err := getSessionToken(r)
+
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// We know the user is authenticated
+
+	var credentials loginData
+
+	err = json.NewDecoder(r.Body).Decode(&credentials)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	err = lc.Cache.Get(c.Value).Err()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var userData model.User
+	lc.DB.Where("username = ?", credentials.Username).First(&userData)
+
+	if userData.Username == "" {
+		fmt.Fprintf(w, "No user found by the username %s\n", credentials.Username)
+		return
+	}
+
+	hashedPass := sha256.Sum256([]byte(credentials.Password + lc.Salt))
+
+	if !bytes.Equal([]byte(userData.Password), hashedPass[:]) {
+		fmt.Fprint(w, "Incorrect Password\n")
+		return
+	}
+
+	err = lc.DB.Delete(userData).Error
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "session_token",
+		Value:   "",
+		Path:    "/",
+		MaxAge:  -1,
+		Expires: time.Now(),
+	})
 }
