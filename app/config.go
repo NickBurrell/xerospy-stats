@@ -12,8 +12,9 @@ type DatabaseSettings struct {
 }
 
 type ServerSettings struct {
-	Port int
-	Salt string
+	Port    int
+	Salt    string
+	LogFile string
 }
 
 type RedisSettings struct {
@@ -44,6 +45,7 @@ func GenerateConfig() {
 
 	initialConfig := `[ServerSettings]
 Port = 3000
+LogFile = "log.txt"
 Salt = ""
 
 [DatabaseSettings]

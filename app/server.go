@@ -11,6 +11,7 @@ import (
 	"github.com/pelletier/go-toml"
 	"github.com/zero-frost/xerospy-stats/app/routes"
 	"github.com/zero-frost/xerospy-stats/app/routes/middleware"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -54,12 +55,30 @@ func (s *Server) InitServer() {
 	s.InitDatabase()
 	s.InitRedis()
 
+	if _, err := os.Stat("./log"); os.IsNotExist(err) {
+		os.Mkdir("./log", 0755)
+	}
+
+	if _, err = os.Stat("./log/" + s.ServerConfig.ServerSettings.LogFile); err != nil {
+		os.Create("./log/" + s.ServerConfig.ServerSettings.LogFile)
+	}
+
+	logFile, err := os.OpenFile("log/"+s.ServerConfig.ServerSettings.LogFile, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	if err != nil {
+		panic(err)
+	}
+
+	if s.DebugMode {
+		mw := io.MultiWriter(os.Stdout, logFile)
+		log.SetOutput(mw)
+	} else {
+		log.SetOutput(logFile)
+	}
+
 	if s.ServerConfig.ServerSettings.Salt == "" {
 		fmt.Print(color.RedString("[!] Error: Salt not set! Please set a new password salt to continue\n"))
 		os.Exit(3)
 	}
-
-	defer s.Database.Close()
 
 	s.Router = mux.NewRouter()
 
@@ -74,6 +93,8 @@ func (s *Server) InitServer() {
 
 	// Define middlewares
 	s.Router.Use(middleware.LoggingMiddleware)
+
+	log.Println("Server Initialized")
 
 }
 
@@ -95,7 +116,10 @@ func (s *Server) RunServer() {
 		if err := srv.ListenAndServe(); err != nil {
 			log.Println(err)
 		}
+		defer s.Database.Close()
 	}()
+
+	log.Println("Server Started")
 
 	c := make(chan os.Signal, 1)
 
@@ -107,8 +131,10 @@ func (s *Server) RunServer() {
 	defer cancel()
 
 	srv.Shutdown(ctx)
-	log.Print("OS Interrupt")
-	fmt.Println(color.YellowString("[!] Server shutting down\n"))
+	if s.DebugMode {
+		fmt.Println(color.YellowString("[!] Server Shutting Down\n"))
+	}
+	log.Println("Server Shutting Down")
 	os.Exit(0)
 
 }

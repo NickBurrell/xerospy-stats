@@ -27,6 +27,8 @@ func GetAPIRoutes(db *gorm.DB, cache *redis.Client, salt string) *mux.Router {
 
 	apiRouter.HandleFunc("/api/team/{team_id}", tc.GetTeam).Methods("GET")
 	apiRouter.HandleFunc("/api/team", tc.GetTeams).Methods("GET")
+	apiRouter.HandleFunc("/api/team/{team_id}", tc.UpdateTeam).Methods("PUT")
+	apiRouter.HandleFunc("/api/team", tc.UpdateTeam).Methods("POST")
 
 	// TEMPORARY
 	apiRouter.HandleFunc("/api/user/login", lc.Login).Methods("POST")

@@ -9,6 +9,7 @@ import (
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"log"
 	"net/http"
+	"reflect"
 	"regexp"
 	"time"
 )
@@ -22,19 +23,6 @@ type loginData struct {
 	Username string
 	Password string
 	Email    string
-}
-
-func getSessionToken(r *http.Request) (*http.Cookie, error) {
-	c, err := r.Cookie("session_token")
-
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return &http.Cookie{}, http.ErrNoCookie
-		}
-		return &http.Cookie{}, http.ErrNoCookie
-	}
-
-	return c, nil
 }
 
 func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
@@ -81,34 +69,22 @@ func (lc LoginController) Login(w http.ResponseWriter, r *http.Request) {
 		Expires: time.Now().Add(300 * time.Second),
 	})
 
-	w.WriteHeader(http.StatusOK)
-
 }
 
 func (lc LoginController) Refresh(w http.ResponseWriter, r *http.Request) {
 
-	c, err := getSessionToken(r)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+	var sessionToken string
+	var err error
+	var statusCode int
+	if statusCode, sessionToken, err = lc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
 
-	sessionToken := c.Value
-
-	response, err := lc.Cache.Get(sessionToken).Result()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if response == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// At this point we know the user is valid
+	res, _ := lc.Cache.Get(sessionToken).Result()
 
 	newSessionToken, _ := uuid.NewV4()
-	err = lc.Cache.Set(newSessionToken.String(), fmt.Sprint(response), time.Duration(300*time.Second)).Err()
+	err = lc.Cache.Set(newSessionToken.String(), fmt.Sprint(res), time.Duration(300*time.Second)).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -130,13 +106,13 @@ func (lc LoginController) Refresh(w http.ResponseWriter, r *http.Request) {
 
 func (lc LoginController) Logout(w http.ResponseWriter, r *http.Request) {
 
-	c, err := getSessionToken(r)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+	var sessionToken string
+	var err error
+	var statusCode int
+	if statusCode, sessionToken, err = lc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
-
-	sessionToken := c.Value
 
 	err = lc.Cache.Del(sessionToken).Err()
 	if err != nil {
@@ -144,40 +120,26 @@ func (lc LoginController) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c.MaxAge = -1
-	c.Value = ""
-	c.Path = "/"
-	http.SetCookie(w, c)
+	http.SetCookie(w, &http.Cookie{
+		Name:   "session_token",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
 }
 
 func (lc LoginController) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	var credentials loginData
 
-	err := json.NewDecoder(r.Body).Decode(&credentials)
-	if err != nil {
+	var err error
+	if err = json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
 	if credentials.Email == "" || credentials.Password == "" || credentials.Username == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var placeholderUsernameCheck model.User
-	var placeholderEmailCheck model.User
-	lc.DB.Where("username = ?", credentials.Username).First(&placeholderUsernameCheck)
-	lc.DB.Where("email = ?", credentials.Username).First(&placeholderEmailCheck)
-
-	if placeholderUsernameCheck.Username != "" {
-		w.WriteHeader(http.StatusForbidden)
-		log.Printf("Username `%s` already taken", placeholderUsernameCheck.Username)
-		return
-	}
-
-	if placeholderEmailCheck.Username != "" {
-		w.WriteHeader(http.StatusForbidden)
-		log.Printf("Email Address `%s` already in use", placeholderEmailCheck.Email)
 		return
 	}
 
@@ -192,6 +154,25 @@ func (lc LoginController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Invalid Email %s", credentials.Email)
 		return
 	}
+
+	var placeholderUsernameCheck model.User
+	lc.DB.Where("username = ?", credentials.Username).First(&placeholderUsernameCheck)
+
+	if placeholderUsernameCheck.Username != "" {
+		w.WriteHeader(http.StatusForbidden)
+		log.Printf("Username `%s` already taken", placeholderUsernameCheck.Username)
+		return
+	}
+
+	var placeholderEmailCheck model.User
+	lc.DB.Where("email = ?", credentials.Username).First(&placeholderEmailCheck)
+
+	if placeholderEmailCheck.Username != "" {
+		w.WriteHeader(http.StatusForbidden)
+		log.Printf("Email Address `%s` already in use", placeholderEmailCheck.Email)
+		return
+	}
+
 	hashedBytes := sha256.Sum256([]byte(credentials.Password + lc.Salt))
 	hashedPass := string(hashedBytes[:])
 
@@ -201,39 +182,19 @@ func (lc LoginController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Password: hashedPass,
 	})
 
-	sessionToken, _ := uuid.NewV4()
-
-	err = lc.Cache.Set(sessionToken.String(), credentials.Username, time.Duration(300*time.Second)).Err()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:    "session_token",
-		Value:   sessionToken.String(),
-		Path:    "/",
-		Expires: time.Now().Add(300 * time.Second),
-	})
-
 }
 
 func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
-	var updatedUserData loginData
-
-	c, err := r.Cookie("session_token")
-
-	if err != nil {
-		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		w.WriteHeader(http.StatusBadRequest)
+	var sessionToken string
+	var err error
+	var statusCode int
+	if statusCode, sessionToken, err = lc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
 
-	sessionToken := c.Value
+	var updatedUserData loginData
 
 	err = json.NewDecoder(r.Body).Decode(&updatedUserData)
 	if err != nil {
@@ -244,12 +205,6 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	response, err := lc.Cache.Get(sessionToken).Result()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if !model.ValidateEmail(updatedUserData.Email) && updatedUserData.Email != "" {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Invalid Email %s", updatedUserData.Email)
 		return
 	}
 
@@ -268,14 +223,14 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		updatedUserData.Password = string(newHashedPass[:])
 	}
 
-	if updatedUserData.Username != "" {
-		userData.Username = updatedUserData.Username
-	}
-	if updatedUserData.Email != "" {
-		userData.Email = updatedUserData.Email
-	}
-	if updatedUserData.Password != "" {
-		userData.Password = updatedUserData.Password
+	current := reflect.ValueOf(userData).Elem()
+	update := reflect.ValueOf(updatedUserData).Elem()
+	for i := 0; i < update.NumField(); i++ {
+		currentField := current.Field(i)
+		updatedFieldValue := reflect.Value(update.Field(i))
+		if updatedFieldValue.String() != "" && !updatedFieldValue.IsNil() {
+			currentField.Set(updatedFieldValue)
+		}
 	}
 
 	lc.DB.Save(&userData)
@@ -305,14 +260,13 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (lc LoginController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
-	c, err := getSessionToken(r)
-
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
+	var sessionToken string
+	var err error
+	var statusCode int
+	if statusCode, sessionToken, err = lc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
-
-	// We know the user is authenticated
 
 	var credentials loginData
 
@@ -322,7 +276,7 @@ func (lc LoginController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = lc.Cache.Get(c.Value).Err()
+	err = lc.Cache.Get(sessionToken).Err()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
