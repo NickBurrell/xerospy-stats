@@ -17,7 +17,6 @@ func (tc *TeamController) GetTeam(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	team := model.Team{}
 	tc.DB.Where("_id = ?", vars["team_id"]).First(&team)
-	fmt.Printf("%+v\n", team)
 	team_data, err := json.Marshal(team)
 	if err != nil {
 		fmt.Fprint(w, "Error: No team found with id"+vars["team_id"])
@@ -40,18 +39,14 @@ func (tc *TeamController) GetTeams(w http.ResponseWriter, r *http.Request) {
 
 func (tc *TeamController) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 
-	vars := mux.Vars(r)
-
-	c, err := r.Cookie("session_token")
-
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return
-		}
+	var err error
+	var statusCode int
+	if statusCode, _, err = tc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
 
-	sessionToken := c.Value
+	vars := mux.Vars(r)
 
 	var updateData model.Team
 
@@ -61,13 +56,8 @@ func (tc *TeamController) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res string
-	if res, err = tc.Cache.Get(sessionToken).Result(); res == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 	var oldData model.Team
+
 	tc.DB.Where("_id = ?", vars["team_id"]).First(&oldData)
 
 	current := reflect.ValueOf(oldData).Elem()
@@ -86,28 +76,18 @@ func (tc *TeamController) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 
 func (tc *TeamController) AddTeam(w http.ResponseWriter, r *http.Request) {
 
-	c, err := r.Cookie("session_token")
-
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return
-		}
+	var err error
+	var statusCode int
+	if statusCode, _, err = tc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
-
-	sessionToken := c.Value
 
 	var updateData model.Team
 
 	err = json.NewDecoder(r.Body).Decode(&updateData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	var res string
-	if res, err = tc.Cache.Get(sessionToken).Result(); res == "" {
-		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
@@ -126,29 +106,19 @@ func (tc *TeamController) AddTeam(w http.ResponseWriter, r *http.Request) {
 
 func (tc *TeamController) DeleteTeam(w http.ResponseWriter, r *http.Request) {
 
-	c, err := r.Cookie("session_token")
-
-	if err != nil {
-		if err == http.ErrNoCookie {
-			return
-		}
+	var err error
+	var statusCode int
+	if statusCode, _, err = tc.ValidateSession(r); err != nil {
+		w.WriteHeader(statusCode)
 		return
 	}
 
-	sessionToken := c.Value
+	vars := mux.Vars(r)
 
-	var updateData model.Team
-
-	err = json.NewDecoder(r.Body).Decode(&updateData)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	var teamData model.Team
+	tc.DB.Where("_id = ?", vars["team_id"]).First(&teamData)
+	if err = tc.DB.Delete(teamData).Error; err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var res string
-	if res, err = tc.Cache.Get(sessionToken).Result(); res == "" {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
 }

@@ -15,6 +15,12 @@ func GetAPIRoutes(db *gorm.DB, cache *redis.Client, salt string) *mux.Router {
 			Cache: cache,
 		},
 	}
+	ec := controllers.EventController{
+		Controller: &controllers.Controller{
+			DB:    db,
+			Cache: cache,
+		},
+	}
 	lc := controllers.LoginController{
 		Controller: &controllers.Controller{
 			DB:    db,
@@ -25,12 +31,21 @@ func GetAPIRoutes(db *gorm.DB, cache *redis.Client, salt string) *mux.Router {
 
 	apiRouter := mux.NewRouter()
 
-	apiRouter.HandleFunc("/api/team/{team_id}", tc.GetTeam).Methods("GET")
-	apiRouter.HandleFunc("/api/team", tc.GetTeams).Methods("GET")
-	apiRouter.HandleFunc("/api/team/{team_id}", tc.UpdateTeam).Methods("PUT")
-	apiRouter.HandleFunc("/api/team", tc.UpdateTeam).Methods("POST")
+	// Regiser TeamController routes
+	apiRouter.HandleFunc("/api/team/{team_id}", ec.GetEvent).Methods("GET")
+	apiRouter.HandleFunc("/api/team", ec.GetEvent).Methods("GET")
+	apiRouter.HandleFunc("/api/team/{team_id}", ec.UpdateEvent).Methods("PUT")
+	apiRouter.HandleFunc("/api/team", ec.UpdateEvent).Methods("POST")
+	apiRouter.HandleFunc("/api/team", ec.DeleteEvent).Methods("DELETE")
 
-	// TEMPORARY
+	// Register EventController routes
+	apiRouter.HandleFunc("/api/event/{team_id}", tc.GetTeam).Methods("GET")
+	apiRouter.HandleFunc("/api/event", tc.GetTeams).Methods("GET")
+	apiRouter.HandleFunc("/api/event/{team_id}", tc.UpdateTeam).Methods("PUT")
+	apiRouter.HandleFunc("/api/event", tc.UpdateTeam).Methods("POST")
+	apiRouter.HandleFunc("/api/event", tc.DeleteTeam).Methods("DELETE")
+
+	// Register LoginController routes
 	apiRouter.HandleFunc("/api/user/login", lc.Login).Methods("POST")
 	apiRouter.HandleFunc("/api/user/refresh", lc.Refresh)
 	apiRouter.HandleFunc("/api/user/logout", lc.Logout)
