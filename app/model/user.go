@@ -10,6 +10,7 @@ type User struct {
 	Username  string `gorm:"not null;unique"`
 	Email     string `gorm:"not null;unique"`
 	Password  string `gorm:"not null"`
+	APIKey    string `gorm:"not null;size:36;unique"`
 }
 
 func ValidateEmail(email string) bool {

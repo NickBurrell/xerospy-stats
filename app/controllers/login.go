@@ -9,7 +9,6 @@ import (
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"log"
 	"net/http"
-	"reflect"
 	"regexp"
 	"time"
 )
@@ -218,19 +217,11 @@ func (lc LoginController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	lc.DB.Where("username = ?", response).First(&userData)
 
+	err = json.NewDecoder(r.Body).Decode(&userData)
+
 	if updatedUserData.Password != "" {
 		newHashedPass := sha256.Sum256([]byte(updatedUserData.Password + lc.Salt))
 		updatedUserData.Password = string(newHashedPass[:])
-	}
-
-	current := reflect.ValueOf(userData).Elem()
-	update := reflect.ValueOf(updatedUserData).Elem()
-	for i := 0; i < update.NumField(); i++ {
-		currentField := current.Field(i)
-		updatedFieldValue := reflect.Value(update.Field(i))
-		if updatedFieldValue.String() != "" && !updatedFieldValue.IsNil() {
-			currentField.Set(updatedFieldValue)
-		}
 	}
 
 	lc.DB.Save(&userData)

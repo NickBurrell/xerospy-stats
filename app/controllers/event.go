@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"net/http"
-	"reflect"
 )
 
 type EventController struct {
@@ -18,24 +17,24 @@ func (ec *EventController) GetEvent(w http.ResponseWriter, r *http.Request) {
 	event := model.Event{}
 	ec.DB.Where("_id = ?", vars["event_id"]).First(&event)
 	fmt.Printf("%+v\n", event)
-	event_data, err := json.Marshal(event)
+	eventData, err := json.Marshal(event)
 	if err != nil {
 		fmt.Fprint(w, "Error: No team found with id"+vars["event_id"])
 		return
 	}
-	fmt.Fprint(w, string(event_data))
+	fmt.Fprint(w, string(eventData))
 }
 
 func (ec *EventController) GetEvents(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	teams := make([]model.Event, 0)
 	ec.DB.Where("_id = ?", vars["event_id"]).First(&teams)
-	event_data, err := json.Marshal(teams)
+	eventData, err := json.Marshal(teams)
 	if err != nil {
 		fmt.Fprint(w, "Error: No team found with id"+vars["event_id"])
 		return
 	}
-	fmt.Fprint(w, string(event_data))
+	fmt.Fprint(w, string(eventData))
 }
 
 func (ec *EventController) UpdateEvent(w http.ResponseWriter, r *http.Request) {
@@ -51,23 +50,12 @@ func (ec *EventController) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 
+	ec.DB.Where("_id = ?", vars["event_id"]).First(&updateData)
+
 	err = json.NewDecoder(r.Body).Decode(&updateData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-	}
-
-	var oldData model.Event
-	ec.DB.Where("_id = ?", vars["event_id"]).First(&oldData)
-
-	current := reflect.ValueOf(oldData).Elem()
-	update := reflect.ValueOf(updateData).Elem()
-	for i := 0; i < update.NumField(); i++ {
-		currentField := current.Field(i)
-		updateFieldValue := reflect.Value(update.Field(i))
-		if updateFieldValue.String() != "" {
-			currentField.Set(updateFieldValue)
-		}
 	}
 
 	ec.DB.Save(updateData)

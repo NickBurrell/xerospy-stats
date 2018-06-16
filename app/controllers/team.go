@@ -6,7 +6,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/zero-frost/xerospy-stats/app/model"
 	"net/http"
-	"reflect"
 )
 
 type TeamController struct {
@@ -17,24 +16,24 @@ func (tc *TeamController) GetTeam(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	team := model.Team{}
 	tc.DB.Where("_id = ?", vars["team_id"]).First(&team)
-	team_data, err := json.Marshal(team)
+	teamData, err := json.Marshal(team)
 	if err != nil {
 		fmt.Fprint(w, "Error: No team found with id"+vars["team_id"])
 		return
 	}
-	fmt.Fprint(w, string(team_data))
+	fmt.Fprint(w, string(teamData))
 }
 
 func (tc *TeamController) GetTeams(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	teams := make([]model.Team, 0)
 	tc.DB.Where("_id = ?", vars["team_id"]).First(&teams)
-	team_data, err := json.Marshal(teams)
+	teamData, err := json.Marshal(teams)
 	if err != nil {
 		fmt.Fprint(w, "Error: No team found with id"+vars["team_id"])
 		return
 	}
-	fmt.Fprint(w, string(team_data))
+	fmt.Fprint(w, string(teamData))
 }
 
 func (tc *TeamController) UpdateTeam(w http.ResponseWriter, r *http.Request) {
@@ -50,24 +49,12 @@ func (tc *TeamController) UpdateTeam(w http.ResponseWriter, r *http.Request) {
 
 	var updateData model.Team
 
+	tc.DB.Where("_id = ?", vars["team_id"]).First(&updateData)
+
 	err = json.NewDecoder(r.Body).Decode(&updateData)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
-	}
-
-	var oldData model.Team
-
-	tc.DB.Where("_id = ?", vars["team_id"]).First(&oldData)
-
-	current := reflect.ValueOf(oldData).Elem()
-	update := reflect.ValueOf(updateData).Elem()
-	for i := 0; i < update.NumField(); i++ {
-		currentField := current.Field(i)
-		updateFieldValue := reflect.Value(update.Field(i))
-		if updateFieldValue.String() != "" {
-			currentField.Set(updateFieldValue)
-		}
 	}
 
 	tc.DB.Save(updateData)
